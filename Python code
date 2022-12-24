@@ -1,0 +1,142 @@
+import pandas as pd
+import numpy as np
+import os
+from fnmatch import fnmatch
+import matplotlib.pyplot as plt
+
+root = 'Project_Data'
+pattern = "*.csv"
+names_list = []
+for path, subdirs, files in os.walk(root):
+    for name in files:
+        if fnmatch(name, pattern):
+            names_list.append(os.path.join(path, name))
+
+#print(names_list)
+
+Bike_Trips = pd.concat([pd.read_csv(f) for f in names_list])
+
+# ========== Splitting date and time ============
+Bike_Trips['Start_Date'] = pd.to_datetime(Bike_Trips['start_time']).dt.date
+Bike_Trips['Start_Time'] = pd.to_datetime(Bike_Trips['start_time']).dt.time
+Bike_Trips['End_Date'] = pd.to_datetime(Bike_Trips['end_time']).dt.date
+Bike_Trips['End_Time'] = pd.to_datetime(Bike_Trips['end_time']).dt.time
+Bike_Trips.drop('start_time', axis=1, inplace= True)
+Bike_Trips.drop('end_time', axis=1, inplace= True)
+
+# Exporting data to CSV
+
+print(Bike_Trips.head())
+print(Bike_Trips.info())
+
+# ================== Missing values ====================
+isNA_vals = Bike_Trips.isna()
+tot_num_NAs_per_column = isNA_vals.sum()
+total_NAs= tot_num_NAs_per_column.sum()
+print("Number of total NA values: ", total_NAs)
+print("Total number of NA values: ", Bike_Trips.isna().sum().sum())
+
+# =============== dropping duplicates and NA values ==================
+print("Missing values initially :\n", Bike_Trips.isna().sum())
+
+Bike_Trips.drop_duplicates()
+Bike_Trips = Bike_Trips.dropna(subset=['start_lat', 'end_lat', 'start_lon', 'end_lon', 'plan_duration'])
+
+# Missing values in each column
+print("Missing values after dropping:\n", Bike_Trips.isna().sum())
+
+# =========== Finding cardinality ================
+cardi = Bike_Trips.apply(pd.Series.nunique)
+print("Cardinality:\n", cardi)
+
+# trip id drop duplicates
+# pass holder column can be dropped
+# long and latitude
+
+# ========= Determining correlation with graph =============
+
+columns_list=[]
+for i in Bike_Trips.columns:
+    columns_list.append(i)
+print(columns_list)
+
+import seaborn as sb
+sb.heatmap(Bike_Trips.corr(method='kendall'), annot = True)
+plt.show()
+
+# Finding wrong values
+lon = ['start_lon', 'end_lon']
+wrong_longitudes = []
+
+for j in lon:
+    for i in Bike_Trips[j]:
+        if i > 0:
+            wrong_longitudes.append(i)
+
+print("wrong longitudes: ",wrong_longitudes)
+
+lat = ['start_lat', 'end_lat']
+wrong_latitudes = []
+
+for j in lat:
+    for i in Bike_Trips[j]:
+        if i < 0:
+            wrong_latitudes.append(i)
+
+print("wrong latitudes:", wrong_latitudes)
+# We have one longitude that is incorrect
+# finding the position
+
+for i in wrong_longitudes:
+    wrong_longitude_index = Bike_Trips.index[Bike_Trips['start_lon']==i].tolist()
+    print("Wrong longitude is at: ", wrong_longitude_index)
+    Bike_Trips = Bike_Trips.drop(index=wrong_longitude_index)
+
+# Categories or patterns within variables:
+
+selected_columns_for_groups = ['plan_duration','trip_route_category','passholder_type','bike_type','start_station','plan_duration']
+for i in selected_columns_for_groups:
+    print(Bike_Trips.groupby([i]).size())
+
+# Exporting
+#Bike_Trips.to_csv("Bike_trip_data.csv")
+
+# ============== Printing top 5 ==================
+
+for i in columns_list:
+    if Bike_Trips[i].dtype != object:
+          print("For", i, "Highest 5 values are")
+          print(Bike_Trips[i].nlargest(n=5))
+
+# finding correlation
+
+# correlation = []
+# a=[]
+# b=[]
+# c=[]
+#
+#
+# for i in range(0, len(columns_list)-1):
+#     for j in range(len(columns_list)):
+#         corr, p = stats.pearsonr(Bike_Trips[columns_list[i]], Bike_Trips[columns_list[j]]) # this part of line is not working
+#         new_dic = {
+#             'Variable 1': columns_list[11],
+#             'Variable 2' : columns_list[i],
+#             'Correlation Value' : corr,
+#         }
+#
+#         correlation.append(new_dic)
+#
+#         if corr > 0:
+#             a.append(columns_list[i])
+#         elif corr < 0:
+#             b.append(columns_list[i])
+#         else:
+#             c.append(columns_list[i])
+#
+# corr_P = pd.DataFrame(correlation)
+# print(corr_P)
+#
+# print("variables appear to have a positive correlation", a)
+# print("variables appear to have a negative correlation", b)
+# print("variables are you unable to determine correlation", c)
